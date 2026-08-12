@@ -1449,7 +1449,7 @@
   }
 
   async function parseExpenseWithGemini(text, apiKey) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/interactions`;
     const prompt = `Витягни з цього українського/польського голосового запису про покупку назву товару/послуги та суму витрачених грошей у злотих (PLN).
 Текст: "${text}"
 Поверни ЛИШЕ JSON без жодного іншого тексту, у форматі: {"name": "назва товару українською, коротко", "amount": число}
@@ -1457,10 +1457,14 @@
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey
+      },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.1, responseMimeType: 'application/json' }
+        model: 'gemini-3.5-flash',
+        input: prompt,
+        response_format: { type: 'text', mime_type: 'application/json' }
       })
     });
 
@@ -1470,8 +1474,24 @@
     }
 
     const data = await response.json();
-    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!rawText) throw new Error('empty response');
+
+    // Extract text from the Interactions API response shape.
+    // Newer shape: { outputs: [{ type: 'text', text: '...' }] }
+    // Also seen: { steps: [{ type: 'model_output', content: [{ type: 'text', text: '...' }] }] }
+    let rawText = null;
+    if (Array.isArray(data.outputs)) {
+      const textOut = data.outputs.find(o => o.type === 'text');
+      if (textOut) rawText = textOut.text;
+    }
+    if (!rawText && Array.isArray(data.steps)) {
+      for (const step of data.steps) {
+        if (step.type === 'model_output' && Array.isArray(step.content)) {
+          const textBlock = step.content.find(c => c.type === 'text');
+          if (textBlock) { rawText = textBlock.text; break; }
+        }
+      }
+    }
+    if (!rawText) throw new Error('empty response: ' + JSON.stringify(data).slice(0, 300));
 
     const cleaned = rawText.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(cleaned);
