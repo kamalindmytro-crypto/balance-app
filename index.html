@@ -105,6 +105,47 @@
     text-align: center;
   }
  
+  /* ---------- Wallet tabs ---------- */
+  .wallet-tabs {
+    display: flex;
+    gap: 6px;
+    padding: 4px 20px 0;
+    justify-content: center;
+  }
+ 
+  .wallet-tab {
+    flex: 1;
+    max-width: 150px;
+    padding: 9px 4px;
+    border-radius: 12px;
+    border: 1px solid var(--stroke);
+    background: var(--bg-card);
+    color: var(--text-faint);
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transition: border-color .15s, color .15s, background .15s, transform .1s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .wallet-tab:active { transform: scale(0.97); }
+  .wallet-tab .wt-balance {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--text-dim);
+  }
+  .wallet-tab.active {
+    border-color: var(--amber-dim);
+    background: rgba(232,165,75,0.1);
+    color: var(--amber);
+  }
+  .wallet-tab.active .wt-balance { color: var(--amber-bright); }
+  .wallet-tab.negative .wt-balance { color: var(--danger-bright); }
+ 
   .balance-label {
     font-size: 12px;
     letter-spacing: 0.12em;
@@ -123,7 +164,9 @@
     display: flex;
     align-items: baseline;
     gap: 6px;
+    transition: color .2s;
   }
+  .balance-value.negative { color: var(--danger-bright); }
   .balance-value .cur {
     font-size: 22px;
     color: var(--text-faint);
@@ -139,6 +182,7 @@
     animation: pulse-dot 2.4s ease-in-out infinite;
     align-self: center;
   }
+  .balance-value.negative .live-dot { background: var(--danger-bright); }
   @keyframes pulse-dot {
     0%, 100% { opacity: 0.35; transform: scale(0.85); }
     50% { opacity: 1; transform: scale(1.15); }
@@ -237,6 +281,24 @@
   .vessel-label .n {
     color: var(--text-dim);
     font-weight: 600;
+  }
+  .vessel-label .n.neg {
+    color: var(--danger-bright);
+  }
+ 
+  /* Negative-balance vessel: fills from the TOP downward in red, like a debt draining in. */
+  .vessel-negative .vessel-fill {
+    border-radius: 0 0 14px 14px;
+  }
+  .vessel-fill-negative {
+    top: 0;
+    bottom: auto;
+    background: linear-gradient(0deg, var(--danger-bright) 0%, var(--danger) 55%, #8a3c34 100%);
+    border-radius: 14px 14px 0 0 !important;
+  }
+  .vessel-fill-negative::after {
+    top: auto;
+    bottom: -6px;
   }
  
   .vessel-overflow-badge {
@@ -819,8 +881,12 @@
     </div>
   </div>
  
+  <div class="wallet-tabs" id="walletTabs">
+    <!-- wallet tab buttons injected here -->
+  </div>
+ 
   <div class="hero">
-    <div class="balance-label">Поточний баланс</div>
+    <div class="balance-label" id="balanceLabel">Поточний баланс</div>
     <div class="balance-value mono">
       <span id="balanceValue">0,00</span>
       <span class="cur">zł</span>
@@ -895,8 +961,8 @@
 <!-- Stats sheet -->
 <div class="sheet stats-sheet" id="statsSheet">
   <div class="sheet-handle"></div>
-  <div class="sheet-title">Статистика</div>
-  <div class="sheet-subtitle">Історія карманних розходів</div>
+  <div class="sheet-title" id="statsTitle">Статистика</div>
+  <div class="sheet-subtitle" id="statsSubtitle">Історія розходів</div>
  
   <div class="stats-summary">
     <div class="stat-box">
@@ -938,13 +1004,13 @@
 <!-- Settings sheet -->
 <div class="sheet" id="settingsSheet">
   <div class="sheet-handle"></div>
-  <div class="sheet-title">Налаштування</div>
-  <div class="sheet-subtitle">Параметри балансу та накопичення</div>
+  <div class="sheet-title">Налаштування · <span id="settingsWalletLabel">Загальний</span></div>
+  <div class="sheet-subtitle">Параметри балансу та накопичення цього гаманця</div>
  
   <div class="field">
     <label class="field-label">Початковий баланс (zł)</label>
     <input type="text" inputmode="decimal" class="field-input mono" id="settingInitial">
-    <div class="field-hint">Базова сума, з якої стартує розрахунок</div>
+    <div class="field-hint">Базова сума, з якої стартує розрахунок. Може бути відʼємною.</div>
   </div>
  
   <div class="field">
@@ -1112,27 +1178,85 @@
 (function() {
   'use strict';
  
-  const STORAGE_KEY = 'balance_app_state_v1';
+  const STORAGE_KEY = 'balance_app_state_v2';
+  const LEGACY_STORAGE_KEY = 'balance_app_state_v1';
+ 
+  const WALLET_IDS = ['general', 'car', 'pocket'];
+  const WALLET_LABELS = {
+    general: 'Загальний',
+    car: 'Авто',
+    pocket: 'Кармана'
+  };
+ 
+  function makeDefaultWallet(initialBalance) {
+    return {
+      initialBalance: initialBalance,
+      ratePerMinute: 0.017,
+      capacity: 750,
+      startedAt: Date.now(),
+      checkpointBalance: initialBalance,
+      spentBaseline: 0,
+      expenses: [] // {id, name, amount, ts}
+    };
+  }
  
   const defaultState = {
-    initialBalance: 500,
-    ratePerMinute: 0.017,
-    capacity: 750,
-    startedAt: Date.now(),
-    checkpointBalance: 500, // balance value at startedAt (accrual starts counting from here)
-    spentBaseline: 0,
+    activeWallet: 'general',
     apiKey: '',
-    expenses: [] // {id, name, amount, ts}
+    wallets: {
+      general: makeDefaultWallet(500),
+      car: makeDefaultWallet(0),
+      pocket: makeDefaultWallet(0)
+    }
   };
+ 
+  function migrateLegacyState() {
+    try {
+      const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (!raw) return null;
+      const old = JSON.parse(raw);
+      const migrated = {
+        activeWallet: 'general',
+        apiKey: old.apiKey || '',
+        wallets: {
+          general: {
+            initialBalance: old.initialBalance ?? 500,
+            ratePerMinute: old.ratePerMinute ?? 0.017,
+            capacity: old.capacity ?? 750,
+            startedAt: old.startedAt ?? Date.now(),
+            checkpointBalance: old.checkpointBalance ?? (old.initialBalance ?? 500),
+            spentBaseline: old.spentBaseline ?? 0,
+            expenses: old.expenses ?? []
+          },
+          car: makeDefaultWallet(0),
+          pocket: makeDefaultWallet(0)
+        }
+      };
+      return migrated;
+    } catch (e) {
+      return null;
+    }
+  }
  
   function loadState() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return { ...defaultState };
-      const parsed = JSON.parse(raw);
-      return { ...defaultState, ...parsed };
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const merged = { ...defaultState, ...parsed };
+        merged.wallets = {
+          general: { ...makeDefaultWallet(500), ...(parsed.wallets && parsed.wallets.general) },
+          car: { ...makeDefaultWallet(0), ...(parsed.wallets && parsed.wallets.car) },
+          pocket: { ...makeDefaultWallet(0), ...(parsed.wallets && parsed.wallets.pocket) }
+        };
+        return merged;
+      }
+      // No v2 state yet — try to migrate from legacy v1 single-balance state.
+      const migrated = migrateLegacyState();
+      if (migrated) return migrated;
+      return JSON.parse(JSON.stringify(defaultState));
     } catch (e) {
-      return { ...defaultState };
+      return JSON.parse(JSON.stringify(defaultState));
     }
   }
  
@@ -1142,10 +1266,17 @@
  
   let state = loadState();
  
+  function activeWallet() {
+    return state.wallets[state.activeWallet];
+  }
+ 
   // ---------- Helpers ----------
   function fmt(n) {
-    const v = Math.max(0, n);
-    return v.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return n.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+ 
+  function fmtAbs(n) {
+    return Math.abs(n).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
  
   function fmtDate(ts) {
@@ -1155,25 +1286,26 @@
     return `${datePart}, ${timePart}`;
   }
  
-  // Total of expenses recorded, all-time (used for stats display).
-  function totalSpentAllTime() {
-    return state.expenses.reduce((s, e) => s + e.amount, 0);
+  // Total of expenses recorded, all-time for a wallet (used for stats display).
+  function totalSpentAllTime(wallet) {
+    return wallet.expenses.reduce((s, e) => s + e.amount, 0);
   }
  
   // Total of expenses that count against the current balance checkpoint.
-  // state.spentBaseline marks how much had already been spent (and thus already
+  // wallet.spentBaseline marks how much had already been spent (and thus already
   // "baked into" initialBalance) at the moment startedAt was last reset.
-  function totalSpentSinceCheckpoint() {
-    return totalSpentAllTime() - (state.spentBaseline || 0);
+  function totalSpentSinceCheckpoint(wallet) {
+    return totalSpentAllTime(wallet) - (wallet.spentBaseline || 0);
   }
  
-  function accruedSinceStart() {
-    const minutesElapsed = (Date.now() - state.startedAt) / 60000;
-    return minutesElapsed * state.ratePerMinute;
+  function accruedSinceStart(wallet) {
+    const minutesElapsed = (Date.now() - wallet.startedAt) / 60000;
+    return minutesElapsed * wallet.ratePerMinute;
   }
  
-  function currentBalance() {
-    return state.checkpointBalance + accruedSinceStart() - totalSpentSinceCheckpoint();
+  function currentBalance(wallet) {
+    wallet = wallet || activeWallet();
+    return wallet.checkpointBalance + accruedSinceStart(wallet) - totalSpentSinceCheckpoint(wallet);
   }
  
   // ---------- Rendering ----------
@@ -1192,19 +1324,26 @@
   }
  
   function renderVessels() {
-    const bal = Math.max(0, currentBalance());
-    const capacity = state.capacity > 0 ? state.capacity : 750;
-    const vesselCount = Math.max(1, Math.floor(bal / capacity) + 1);
+    const wallet = activeWallet();
+    const bal = currentBalance(wallet);
+    const capacity = wallet.capacity > 0 ? wallet.capacity : 750;
+    const absBal = Math.abs(bal);
+    const vesselCount = Math.max(1, Math.floor(absBal / capacity) + 1);
+    const isNegative = bal < 0;
  
-    // Only rebuild DOM if vessel count changed
-    if (vesselZone.childElementCount !== vesselCount) {
+    // Rebuild DOM if vessel count or polarity changed
+    const needsRebuild = vesselZone.childElementCount !== vesselCount ||
+      vesselZone.dataset.polarity !== (isNegative ? 'neg' : 'pos');
+ 
+    if (needsRebuild) {
       vesselZone.innerHTML = '';
+      vesselZone.dataset.polarity = isNegative ? 'neg' : 'pos';
       for (let i = 0; i < vesselCount; i++) {
         const wrap = document.createElement('div');
         wrap.className = 'vessel-wrap';
  
         const vessel = document.createElement('div');
-        vessel.className = 'vessel';
+        vessel.className = 'vessel' + (isNegative ? ' vessel-negative' : '');
         vessel.id = 'vessel-' + i;
  
         const ticks = document.createElement('div');
@@ -1213,7 +1352,7 @@
         vessel.appendChild(ticks);
  
         const fill = document.createElement('div');
-        fill.className = 'vessel-fill';
+        fill.className = 'vessel-fill' + (isNegative ? ' vessel-fill-negative' : '');
         fill.id = 'vfill-' + i;
         vessel.appendChild(fill);
  
@@ -1232,21 +1371,29 @@
       if (i < vesselCount - 1) {
         portion = capacity;
       } else {
-        portion = bal - (vesselCount - 1) * capacity;
+        portion = absBal - (vesselCount - 1) * capacity;
       }
       const pct = Math.min(100, Math.max(0, (portion / capacity) * 100));
       const fillEl = document.getElementById('vfill-' + i);
       const labelEl = document.getElementById('vlabel-' + i);
       if (fillEl) fillEl.style.height = pct + '%';
-      if (labelEl) labelEl.innerHTML = `<span class="n">${fmt(portion)}</span> / ${fmt(capacity)} zł`;
+      if (labelEl) {
+        labelEl.innerHTML = isNegative
+          ? `<span class="n neg">−${fmt(portion)}</span> / ${fmt(capacity)} zł`
+          : `<span class="n">${fmt(portion)}</span> / ${fmt(capacity)} zł`;
+      }
     }
   }
  
   function renderBalance() {
-    const bal = currentBalance();
-    balanceValueEl.textContent = fmt(bal);
-    balanceSubEl.textContent = `+${fmt(state.ratePerMinute).replace(/,00$/, ',' + state.ratePerMinute.toFixed(3).split('.')[1])} zł / хв`;
+    const wallet = activeWallet();
+    const bal = currentBalance(wallet);
+    const isNegative = bal < 0;
+    balanceValueEl.textContent = (isNegative ? '−' : '') + fmtAbs(bal);
+    balanceValueEl.classList.toggle('negative', isNegative);
+    updateBalanceSub();
     renderVessels();
+    renderWalletTabs();
   }
  
   // Fix rate display formatting (rate is small, needs 3 decimals typically)
@@ -1254,8 +1401,37 @@
     return r.toLocaleString('pl-PL', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
   }
   function updateBalanceSub() {
-    balanceSubEl.textContent = `+${fmtRate(state.ratePerMinute)} zł / хв`;
+    const wallet = activeWallet();
+    balanceSubEl.textContent = `+${fmtRate(wallet.ratePerMinute)} zł / хв`;
   }
+ 
+  // ---------- Wallet tabs ----------
+  const walletTabsEl = document.getElementById('walletTabs');
+  const balanceLabelEl = document.getElementById('balanceLabel');
+ 
+  function renderWalletTabs() {
+    walletTabsEl.innerHTML = '';
+    WALLET_IDS.forEach(id => {
+      const wallet = state.wallets[id];
+      const bal = currentBalance(wallet);
+      const isNeg = bal < 0;
+      const btn = document.createElement('button');
+      btn.className = 'wallet-tab' + (id === state.activeWallet ? ' active' : '') + (isNeg ? ' negative' : '');
+      btn.innerHTML = `
+        <span>${WALLET_LABELS[id]}</span>
+        <span class="wt-balance">${isNeg ? '−' : ''}${fmtAbs(bal)} zł</span>
+      `;
+      btn.addEventListener('click', () => {
+        if (state.activeWallet === id) return;
+        state.activeWallet = id;
+        saveState();
+        renderBalance();
+      });
+      walletTabsEl.appendChild(btn);
+    });
+    balanceLabelEl.textContent = `Баланс · ${WALLET_LABELS[state.activeWallet]}`;
+  }
+ 
  
   // ---------- Toast ----------
   let toastTimer;
@@ -1351,7 +1527,7 @@
     if (!name) { showToast('Введіть назву продукту', true); return; }
     if (isNaN(amount) || amount <= 0) { expenseAmountInput.focus(); showToast('Введіть коректну суму', true); return; }
  
-    state.expenses.unshift({
+    activeWallet().expenses.unshift({
       id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
       name,
       amount,
@@ -1372,8 +1548,11 @@
   const statCountEl = document.getElementById('statCount');
  
   function renderStats() {
-    const expenses = state.expenses;
-    statTotalEl.textContent = fmt(totalSpentAllTime()) + ' zł';
+    const wallet = activeWallet();
+    document.getElementById('statsTitle').textContent = `Статистика · ${WALLET_LABELS[state.activeWallet]}`;
+    document.getElementById('statsSubtitle').textContent = `Історія розходів гаманця «${WALLET_LABELS[state.activeWallet]}»`;
+    const expenses = wallet.expenses;
+    statTotalEl.textContent = fmt(totalSpentAllTime(wallet)) + ' zł';
     statCountEl.textContent = expenses.length;
  
     if (expenses.length === 0) {
@@ -1446,7 +1625,8 @@
   });
  
   function deleteExpense(id) {
-    state.expenses = state.expenses.filter(e => e.id !== id);
+    const wallet = activeWallet();
+    wallet.expenses = wallet.expenses.filter(e => e.id !== id);
     saveState();
     renderBalance();
     renderStats();
@@ -1459,7 +1639,7 @@
   const editAmountInput = document.getElementById('editAmount');
  
   function openEditSheet(id) {
-    const exp = state.expenses.find(e => e.id === id);
+    const exp = activeWallet().expenses.find(e => e.id === id);
     if (!exp) return;
     editingId = id;
     editNameInput.value = exp.name;
@@ -1471,7 +1651,7 @@
   document.getElementById('cancelEdit').addEventListener('click', () => openSheet('stats'));
  
   document.getElementById('saveEdit').addEventListener('click', () => {
-    const exp = state.expenses.find(e => e.id === editingId);
+    const exp = activeWallet().expenses.find(e => e.id === editingId);
     if (!exp) return;
     const name = editNameInput.value.trim();
     const amount = parseAmount(editAmountInput.value);
@@ -1502,36 +1682,39 @@
   const settingApiKey = document.getElementById('settingApiKey');
  
   function openSettings() {
-    settingInitial.value = state.initialBalance.toFixed(2).replace('.', ',');
-    settingRate.value = state.ratePerMinute.toFixed(3).replace('.', ',');
-    settingCapacity.value = state.capacity.toFixed(0);
+    const wallet = activeWallet();
+    document.getElementById('settingsWalletLabel').textContent = WALLET_LABELS[state.activeWallet];
+    settingInitial.value = wallet.initialBalance.toFixed(2).replace('.', ',');
+    settingRate.value = wallet.ratePerMinute.toFixed(3).replace('.', ',');
+    settingCapacity.value = wallet.capacity.toFixed(0);
     settingApiKey.value = state.apiKey || '';
     openSheet('settings');
   }
   document.getElementById('settingsBtn').addEventListener('click', openSettings);
  
   document.getElementById('saveSettings').addEventListener('click', () => {
+    const wallet = activeWallet();
     const newInitial = parseAmount(settingInitial.value);
     const newRate = parseAmount(settingRate.value);
     const newCapacity = parseAmount(settingCapacity.value);
     const newApiKey = settingApiKey.value.trim();
  
-    if (isNaN(newInitial) || newInitial < 0) { showToast('Некоректний початковий баланс', true); return; }
+    if (isNaN(newInitial)) { showToast('Некоректний початковий баланс', true); return; }
     if (isNaN(newRate) || newRate < 0) { showToast('Некоректний приріст', true); return; }
     if (isNaN(newCapacity) || newCapacity <= 0) { showToast('Некоректна місткість шкали', true); return; }
  
     // Store what the user actually typed as the "initial balance" setting.
-    state.initialBalance = newInitial;
-    state.ratePerMinute = newRate;
-    state.capacity = newCapacity;
+    wallet.initialBalance = newInitial;
+    wallet.ratePerMinute = newRate;
+    wallet.capacity = newCapacity;
     state.apiKey = newApiKey;
  
     // Reset the accrual checkpoint to this new initial balance, starting fresh from now,
     // and mark all expenses recorded so far as already "spent" against this new baseline
     // (so past expenses aren't re-subtracted from the freshly-set initial balance).
-    state.checkpointBalance = newInitial;
-    state.startedAt = Date.now();
-    state.spentBaseline = totalSpentAllTime();
+    wallet.checkpointBalance = newInitial;
+    wallet.startedAt = Date.now();
+    wallet.spentBaseline = totalSpentAllTime(wallet);
  
     saveState();
     updateBalanceSub();
@@ -1541,14 +1724,15 @@
   });
  
   document.getElementById('resetAll').addEventListener('click', () => {
-    if (!confirm('Скинути весь баланс і всю історію розходів? Цю дію не можна скасувати.')) return;
-    state = { ...defaultState, startedAt: Date.now() };
+    const label = WALLET_LABELS[state.activeWallet];
+    if (!confirm(`Скинути баланс і всю історію розходів гаманця «${label}»? Цю дію не можна скасувати.`)) return;
+    state.wallets[state.activeWallet] = makeDefaultWallet(state.activeWallet === 'general' ? 500 : 0);
     saveState();
     updateBalanceSub();
     renderBalance();
     renderStats();
     closeAllSheets();
-    showToast('Все скинуто', true);
+    showToast(`Гаманець «${label}» скинуто`, true);
   });
  
   // ---------- Voice expense (Speech recognition + Gemini) ----------
@@ -1728,7 +1912,7 @@
     if (!name) { showToast('Введіть назву продукту', true); return; }
     if (isNaN(amount) || amount <= 0) { showToast('Введіть коректну суму', true); return; }
  
-    state.expenses.unshift({
+    activeWallet().expenses.unshift({
       id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
       name,
       amount,
@@ -1953,8 +2137,9 @@
     if (selected.length === 0) { showToast('Виберіть хоча б одну позицію', true); return; }
  
     const now = Date.now();
+    const wallet = activeWallet();
     selected.forEach((it, idx) => {
-      state.expenses.unshift({
+      wallet.expenses.unshift({
         id: now + '-' + idx + '-' + Math.random().toString(36).slice(2, 6),
         name: it.name.trim(),
         amount: it.amount,
@@ -1986,3 +2171,4 @@
  
 </body>
 </html>
+ 
