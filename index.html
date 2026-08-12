@@ -653,6 +653,101 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* ---------- Receipt sheet ---------- */
+  .receipt-items {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 40vh;
+    overflow-y: auto;
+    margin-bottom: 14px;
+  }
+
+  .receipt-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--stroke);
+    border-radius: 13px;
+    padding: 10px 12px;
+  }
+
+  .receipt-item-check {
+    width: 22px;
+    height: 22px;
+    border-radius: 7px;
+    border: 1.5px solid var(--stroke);
+    background: var(--bg-elevated);
+    flex-shrink: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: transparent;
+    transition: background .15s, border-color .15s, color .15s;
+  }
+  .receipt-item-check svg { width: 14px; height: 14px; }
+  .receipt-item-check.checked {
+    background: var(--amber);
+    border-color: var(--amber);
+    color: #1a1206;
+  }
+
+  .receipt-item-fields {
+    flex: 1;
+    display: flex;
+    gap: 8px;
+    min-width: 0;
+  }
+  .receipt-item-name {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    padding: 4px 0;
+  }
+  .receipt-item-amount {
+    width: 78px;
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    color: var(--amber-bright);
+    font-size: 14px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    text-align: right;
+    outline: none;
+    padding: 4px 0;
+  }
+
+  .receipt-total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 4px;
+    border-top: 1px solid var(--stroke);
+    font-size: 13.5px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .receipt-total-row .mono {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .receipt-empty {
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 14px;
+    padding: 24px 10px;
+  }
+
   ::-webkit-scrollbar { width: 0; height: 0; }
 </style>
 </head>
@@ -695,6 +790,10 @@
       <button class="btn-voice" id="voiceExpenseBtn" aria-label="Голосовий запис розходу">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 00-3 3v6a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M19 10v1a7 7 0 01-14 0v-1M12 18v4M8 22h8"/></svg>
       </button>
+      <button class="btn-voice" id="receiptExpenseBtn" aria-label="Сфотографувати чек">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      </button>
+      <input type="file" id="receiptFileInput" accept="image/*" capture="environment" style="display:none;">
     </div>
     <button class="btn-secondary" id="statsBtnBottom">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
@@ -887,6 +986,43 @@
   </div>
 </div>
 
+<!-- Receipt scan sheet -->
+<div class="sheet" id="receiptSheet">
+  <div class="sheet-handle"></div>
+
+  <div id="receiptStateProcessing">
+    <div class="sheet-title">Читаю чек...</div>
+    <div class="sheet-subtitle">AI розпізнає позиції та ціни</div>
+    <div class="voice-mic-zone">
+      <img id="receiptPreviewImg" style="max-width:100%; max-height:160px; border-radius:12px; margin-bottom:8px; display:none;">
+      <div class="voice-spinner"></div>
+    </div>
+  </div>
+
+  <div id="receiptStateConfirm" style="display:none;">
+    <div class="sheet-title">Знайдено позиції</div>
+    <div class="sheet-subtitle">Приберіть зайве або поправте суми, потім внесіть у список</div>
+    <div class="receipt-items" id="receiptItemsList"></div>
+    <div class="receipt-total-row">
+      <span>Разом до внесення</span>
+      <span class="mono" id="receiptTotalAmount">0,00 zł</span>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-secondary" id="cancelReceiptConfirm">Скасувати</button>
+      <button class="btn-primary" id="saveReceiptExpenses">Внести всі</button>
+    </div>
+  </div>
+
+  <div id="receiptStateError" style="display:none;">
+    <div class="sheet-title">Не вдалося прочитати чек</div>
+    <div class="sheet-subtitle" id="receiptErrorText">Спробуйте зробити чіткіше фото</div>
+    <div class="sheet-actions">
+      <button class="btn-secondary" id="receiptErrorClose">Закрити</button>
+      <button class="btn-primary" id="receiptErrorRetry">Спробувати ще раз</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"><span class="dot"></span><span id="toastMsg">Збережено</span></div>
 
 <script>
@@ -1057,7 +1193,8 @@
     stats: document.getElementById('statsSheet'),
     edit: document.getElementById('editSheet'),
     settings: document.getElementById('settingsSheet'),
-    voice: document.getElementById('voiceSheet')
+    voice: document.getElementById('voiceSheet'),
+    receipt: document.getElementById('receiptSheet')
   };
 
   function openSheet(key) {
@@ -1517,6 +1654,221 @@
     renderBalance();
     closeAllSheets();
     showToast(`Списано ${fmt(amount)} zł`);
+  });
+
+  // ---------- Receipt scan (photo + Gemini vision) ----------
+  const receiptStates = {
+    processing: document.getElementById('receiptStateProcessing'),
+    confirm: document.getElementById('receiptStateConfirm'),
+    error: document.getElementById('receiptStateError')
+  };
+
+  function showReceiptState(key) {
+    Object.values(receiptStates).forEach(el => el.style.display = 'none');
+    receiptStates[key].style.display = 'block';
+  }
+
+  let receiptParsedItems = []; // [{id, name, amount, checked}]
+
+  document.getElementById('receiptExpenseBtn').addEventListener('click', () => {
+    if (!state.apiKey) {
+      showToast('Спочатку додайте Gemini API ключ у налаштуваннях', true);
+      openSettings();
+      return;
+    }
+    document.getElementById('receiptFileInput').value = '';
+    document.getElementById('receiptFileInput').click();
+  });
+
+  document.getElementById('receiptFileInput').addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    showReceiptState('processing');
+    openSheet('receipt');
+
+    try {
+      const { base64, mimeType } = await fileToBase64(file);
+      const previewImg = document.getElementById('receiptPreviewImg');
+      previewImg.src = 'data:' + mimeType + ';base64,' + base64;
+      previewImg.style.display = 'block';
+
+      const items = await parseReceiptWithGemini(base64, mimeType, state.apiKey);
+      if (!items || items.length === 0) throw new Error('empty');
+
+      receiptParsedItems = items.map((it, idx) => ({
+        id: 'ritem-' + idx,
+        name: it.name,
+        amount: it.amount,
+        checked: true
+      }));
+      renderReceiptItems();
+      showReceiptState('confirm');
+    } catch (err) {
+      showReceiptState('error');
+      const raw = (err && err.message) ? err.message : String(err);
+      document.getElementById('receiptErrorText').textContent =
+        raw === 'empty'
+          ? 'Не вдалося знайти жодної позиції на фото. Спробуйте зробити чіткіше, рівне фото чека.'
+          : 'Помилка: ' + raw;
+    }
+  });
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result; // data:image/jpeg;base64,....
+        const match = /^data:(.+);base64,(.*)$/.exec(result);
+        if (!match) { reject(new Error('read failed')); return; }
+        resolve({ mimeType: match[1], base64: match[2] });
+      };
+      reader.onerror = () => reject(new Error('read failed'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function parseReceiptWithGemini(base64Image, mimeType, apiKey) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/interactions`;
+    const prompt = `Це фото чека з магазину (Польща, злоті PLN). Розпізнай усі окремі позиції (товари/послуги) та їхні ціни.
+Поверни ЛИШЕ JSON-масив, без жодного іншого тексту, у форматі:
+[{"name": "коротка назва товару українською", "amount": число}, ...]
+Ігноруй рядки типу "razem", "suma", "podsuma", знижки, номер каси, ПДВ — лише самі товарні позиції з цінами.
+Якщо ціна позиції неоднозначна, найкраще наближення. Якщо чек взагалі нечитабельний, поверни [].`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey
+      },
+      body: JSON.stringify({
+        model: 'gemini-3.5-flash',
+        input: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image', mime_type: mimeType, data: base64Image }
+            ]
+          }
+        ],
+        response_format: { type: 'text', mime_type: 'application/json' }
+      })
+    });
+
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => '');
+      throw new Error('Gemini API error: ' + response.status + ' ' + errBody);
+    }
+
+    const data = await response.json();
+
+    let rawText = null;
+    if (Array.isArray(data.outputs)) {
+      const textOut = data.outputs.find(o => o.type === 'text');
+      if (textOut) rawText = textOut.text;
+    }
+    if (!rawText && Array.isArray(data.steps)) {
+      for (const step of data.steps) {
+        if (step.type === 'model_output' && Array.isArray(step.content)) {
+          const textBlock = step.content.find(c => c.type === 'text');
+          if (textBlock) { rawText = textBlock.text; break; }
+        }
+      }
+    }
+    if (!rawText) throw new Error('empty response: ' + JSON.stringify(data).slice(0, 300));
+
+    const cleaned = rawText.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+    if (!Array.isArray(parsed)) throw new Error('unexpected format');
+
+    return parsed
+      .filter(it => it && it.name && (parseFloat(it.amount) > 0))
+      .map(it => ({ name: String(it.name).trim(), amount: parseFloat(it.amount) }));
+  }
+
+  function renderReceiptItems() {
+    const list = document.getElementById('receiptItemsList');
+    if (receiptParsedItems.length === 0) {
+      list.innerHTML = '<div class="receipt-empty">Жодної позиції не знайдено.</div>';
+    } else {
+      list.innerHTML = '';
+      receiptParsedItems.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'receipt-item';
+        row.dataset.id = item.id;
+        row.innerHTML = `
+          <button class="receipt-item-check ${item.checked ? 'checked' : ''}" aria-label="Вибрати">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          </button>
+          <div class="receipt-item-fields">
+            <input type="text" class="receipt-item-name" value="${escapeHtml(item.name)}">
+            <input type="text" inputmode="decimal" class="receipt-item-amount" value="${item.amount.toFixed(2).replace('.', ',')}">
+          </div>
+        `;
+        list.appendChild(row);
+      });
+    }
+    updateReceiptTotal();
+  }
+
+  function updateReceiptTotal() {
+    const total = receiptParsedItems
+      .filter(it => it.checked)
+      .reduce((s, it) => s + (it.amount || 0), 0);
+    document.getElementById('receiptTotalAmount').textContent = fmt(total) + ' zł';
+  }
+
+  document.getElementById('receiptItemsList').addEventListener('click', (e) => {
+    const checkBtn = e.target.closest('.receipt-item-check');
+    if (!checkBtn) return;
+    const row = e.target.closest('.receipt-item');
+    const item = receiptParsedItems.find(it => it.id === row.dataset.id);
+    if (!item) return;
+    item.checked = !item.checked;
+    checkBtn.classList.toggle('checked', item.checked);
+    updateReceiptTotal();
+  });
+
+  document.getElementById('receiptItemsList').addEventListener('input', (e) => {
+    const row = e.target.closest('.receipt-item');
+    if (!row) return;
+    const item = receiptParsedItems.find(it => it.id === row.dataset.id);
+    if (!item) return;
+    if (e.target.classList.contains('receipt-item-name')) {
+      item.name = e.target.value;
+    } else if (e.target.classList.contains('receipt-item-amount')) {
+      const val = parseAmount(e.target.value);
+      item.amount = isNaN(val) ? 0 : val;
+      updateReceiptTotal();
+    }
+  });
+
+  document.getElementById('cancelReceiptConfirm').addEventListener('click', closeAllSheets);
+  document.getElementById('receiptErrorClose').addEventListener('click', closeAllSheets);
+  document.getElementById('receiptErrorRetry').addEventListener('click', () => {
+    document.getElementById('receiptFileInput').click();
+  });
+
+  document.getElementById('saveReceiptExpenses').addEventListener('click', () => {
+    const selected = receiptParsedItems.filter(it => it.checked && it.name.trim() && it.amount > 0);
+    if (selected.length === 0) { showToast('Виберіть хоча б одну позицію', true); return; }
+
+    const now = Date.now();
+    selected.forEach((it, idx) => {
+      state.expenses.unshift({
+        id: now + '-' + idx + '-' + Math.random().toString(36).slice(2, 6),
+        name: it.name.trim(),
+        amount: it.amount,
+        ts: now
+      });
+    });
+    saveState();
+    renderBalance();
+    closeAllSheets();
+    const total = selected.reduce((s, it) => s + it.amount, 0);
+    showToast(`Внесено ${selected.length} поз. на ${fmt(total)} zł`);
   });
 
   // ---------- Init ----------
