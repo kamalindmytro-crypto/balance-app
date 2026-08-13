@@ -2,8 +2,15 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Баланс</title>
+ 
+<!-- iOS: run as a standalone full-screen app when added to Home Screen (hides Safari UI) -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Баланс">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b0d0f">
 <style>
   @font-face {
     font-family: 'JetBrains Mono';
@@ -66,7 +73,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 18px 20px 6px;
+    padding: calc(18px + env(safe-area-inset-top)) 20px 6px;
   }
  
   .brand {
@@ -166,6 +173,7 @@
     gap: 6px;
     transition: color .2s;
   }
+  .balance-value.positive { color: var(--success); }
   .balance-value.negative { color: var(--danger-bright); }
   .balance-value .cur {
     font-size: 22px;
@@ -182,6 +190,7 @@
     animation: pulse-dot 2.4s ease-in-out infinite;
     align-self: center;
   }
+  .balance-value.positive .live-dot { background: var(--success); }
   .balance-value.negative .live-dot { background: var(--danger-bright); }
   @keyframes pulse-dot {
     0%, 100% { opacity: 0.35; transform: scale(0.85); }
@@ -195,13 +204,101 @@
   }
  
   /* ---------- Vessels ---------- */
-  .vessel-zone {
+  .dash-row {
     display: flex;
-    justify-content: center;
     align-items: flex-end;
-    gap: 22px;
+    gap: 14px;
     padding: 26px 20px 10px;
     min-height: 220px;
+  }
+ 
+  .recent-panel {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-self: stretch;
+    padding-bottom: 4px;
+  }
+ 
+  .recent-panel-title {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 10px;
+    padding-left: 2px;
+  }
+ 
+  .recent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow: hidden;
+  }
+ 
+  .recent-empty {
+    font-size: 12.5px;
+    color: var(--text-faint);
+    padding: 8px 2px;
+    line-height: 1.4;
+  }
+ 
+  .recent-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 11px;
+    background: var(--bg-card);
+    border: 1px solid var(--stroke-soft);
+  }
+ 
+  .recent-item-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--danger-bright);
+    flex-shrink: 0;
+  }
+ 
+  .recent-item-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+ 
+  .recent-item-name {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+ 
+  .recent-item-time {
+    font-size: 10.5px;
+    color: var(--text-faint);
+  }
+ 
+  .recent-item-amount {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--danger-bright);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+ 
+  .vessel-zone {
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-end;
+    gap: 16px;
+    flex-shrink: 0;
   }
  
   .vessel-wrap {
@@ -313,7 +410,7 @@
  
   /* ---------- Bottom actions ---------- */
   .actions {
-    padding: 18px 20px 28px;
+    padding: 18px 20px calc(28px + env(safe-area-inset-bottom));
     margin-top: auto;
     display: flex;
     flex-direction: column;
@@ -895,8 +992,16 @@
     <div class="balance-sub" id="balanceSub">+0,017 zł / хв</div>
   </div>
  
-  <div class="vessel-zone" id="vesselZone">
-    <!-- vessels injected here -->
+  <div class="dash-row">
+    <div class="recent-panel">
+      <div class="recent-panel-title">Останні витрати</div>
+      <div class="recent-list" id="recentList">
+        <!-- last 5 expenses injected here -->
+      </div>
+    </div>
+    <div class="vessel-zone" id="vesselZone">
+      <!-- vessels injected here -->
+    </div>
   </div>
  
   <div class="actions">
@@ -1391,9 +1496,38 @@
     const isNegative = bal < 0;
     balanceValueEl.textContent = (isNegative ? '−' : '') + fmtAbs(bal);
     balanceValueEl.classList.toggle('negative', isNegative);
+    balanceValueEl.classList.toggle('positive', !isNegative);
     updateBalanceSub();
     renderVessels();
     renderWalletTabs();
+    renderRecentList();
+  }
+ 
+  function renderRecentList() {
+    const wallet = activeWallet();
+    const recentListEl = document.getElementById('recentList');
+    const last5 = wallet.expenses.slice(0, 5);
+ 
+    if (last5.length === 0) {
+      recentListEl.innerHTML = '<div class="recent-empty">Поки що жодного розходу</div>';
+      return;
+    }
+ 
+    recentListEl.innerHTML = '';
+    last5.forEach(exp => {
+      const row = document.createElement('div');
+      row.className = 'recent-item';
+      const timeStr = new Date(exp.ts).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+      row.innerHTML = `
+        <span class="recent-item-dot"></span>
+        <div class="recent-item-info">
+          <div class="recent-item-name">${escapeHtml(exp.name)}</div>
+          <div class="recent-item-time">${timeStr}</div>
+        </div>
+        <div class="recent-item-amount">−${fmt(exp.amount)}</div>
+      `;
+      recentListEl.appendChild(row);
+    });
   }
  
   // Fix rate display formatting (rate is small, needs 3 decimals typically)
