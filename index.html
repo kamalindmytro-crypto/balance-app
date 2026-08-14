@@ -261,6 +261,7 @@
     background: var(--danger-bright);
     flex-shrink: 0;
   }
+  .recent-item-dot.income { background: var(--success); }
  
   .recent-item-info {
     flex: 1;
@@ -292,6 +293,7 @@
     white-space: nowrap;
     flex-shrink: 0;
   }
+  .recent-item-amount.income-color { color: var(--success); }
  
   .vessel-zone {
     display: flex;
@@ -424,41 +426,57 @@
   .actions-row .btn-primary { flex: 1; }
  
   .btn-voice {
-    width: 54px;
-    flex-shrink: 0;
+    flex: 1;
+    padding: 12px 8px;
     border-radius: 16px;
     border: 1px solid var(--stroke);
     background: var(--bg-card);
     color: var(--amber);
     cursor: pointer;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 4px;
     transition: transform .12s, border-color .15s, background .15s;
   }
-  .btn-voice svg { width: 21px; height: 21px; }
-  .btn-voice:active { transform: scale(0.94); }
+  .btn-voice svg { width: 19px; height: 19px; }
+  .btn-voice-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+  }
+  .btn-voice:active { transform: scale(0.96); }
   .btn-voice:hover { border-color: var(--amber-dim); background: #1f1a12; }
  
   .btn-primary {
     width: 100%;
-    padding: 16px;
+    padding: 15px 10px;
     border-radius: 16px;
     border: none;
     background: var(--amber);
     color: #1a1206;
-    font-size: 15.5px;
+    font-size: 14.5px;
     font-weight: 700;
     letter-spacing: 0.01em;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    transition: transform .12s, background .15s;
+    gap: 6px;
+    transition: transform .12s, background .15s, filter .15s;
   }
-  .btn-primary:active { transform: scale(0.98); background: var(--amber-bright); }
-  .btn-primary svg { width: 18px; height: 18px; }
+  .btn-primary:active { transform: scale(0.98); filter: brightness(1.1); }
+  .btn-primary svg { width: 17px; height: 17px; flex-shrink: 0; }
+ 
+  .btn-expense {
+    background: var(--danger-bright);
+    color: #2a0a06;
+  }
+  .btn-income {
+    background: var(--success);
+    color: #0a1f0e;
+  }
  
   .btn-secondary {
     width: 100%;
@@ -589,28 +607,35 @@
   .stats-sheet .sheet-title, .stats-sheet .sheet-subtitle { padding: 0 20px; }
   .stats-summary {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     padding: 0 20px 16px;
   }
   .stat-box {
     flex: 1;
+    min-width: 0;
     background: var(--bg-card);
     border: 1px solid var(--stroke);
     border-radius: 14px;
-    padding: 12px 14px;
+    padding: 10px 10px;
   }
   .stat-box .k {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--text-faint);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 6px;
+    letter-spacing: 0.04em;
+    margin-bottom: 5px;
+    white-space: nowrap;
   }
   .stat-box .v {
-    font-size: 17px;
+    font-size: 14.5px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
+  .stat-box .v.expense-color { color: var(--danger-bright); }
+  .stat-box .v.income-color { color: var(--success); }
  
   .expense-list {
     padding: 0 12px;
@@ -650,6 +675,10 @@
     font-size: 15px;
     font-weight: 700;
   }
+  .expense-icon.income-icon {
+    color: var(--success);
+    border-color: rgba(111,169,125,0.3);
+  }
  
   .expense-info { flex: 1; min-width: 0; }
   .expense-name {
@@ -673,6 +702,7 @@
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
+  .expense-amount.income-color { color: var(--success); }
  
   .expense-menu-btn {
     width: 30px;
@@ -1006,15 +1036,23 @@
  
   <div class="actions">
     <div class="actions-row">
-      <button class="btn-primary" id="addExpenseBtn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      <button class="btn-primary btn-expense" id="addExpenseBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg>
         Внести розхід
       </button>
+      <button class="btn-primary btn-income" id="addIncomeBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Внести дохід
+      </button>
+    </div>
+    <div class="actions-row">
       <button class="btn-voice" id="voiceExpenseBtn" aria-label="Голосовий запис розходу">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 00-3 3v6a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M19 10v1a7 7 0 01-14 0v-1M12 18v4M8 22h8"/></svg>
+        <span class="btn-voice-label">Голосом</span>
       </button>
       <button class="btn-voice" id="receiptExpenseBtn" aria-label="Додати фото чека">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        <span class="btn-voice-label">Фото чека</span>
       </button>
       <input type="file" id="receiptCameraInput" accept="image/*" capture="environment" style="display:none;">
       <input type="file" id="receiptGalleryInput" accept="image/*" style="display:none;">
@@ -1039,8 +1077,8 @@
   </div>
  
   <div id="step1">
-    <div class="sheet-title">Що придбали?</div>
-    <div class="sheet-subtitle">Введіть назву продукту чи послуги</div>
+    <div class="sheet-title" id="step1Title">Що придбали?</div>
+    <div class="sheet-subtitle" id="step1Subtitle">Введіть назву продукту чи послуги</div>
     <div class="field">
       <input type="text" class="field-input" id="expenseName" placeholder="Напр. Кава, Продукти, Таксі..." autocomplete="off">
     </div>
@@ -1051,7 +1089,7 @@
   </div>
  
   <div id="step2" style="display:none;">
-    <div class="sheet-title">Скільки витрачено?</div>
+    <div class="sheet-title" id="step2Title">Скільки витрачено?</div>
     <div class="sheet-subtitle" id="step2Subtitle">Сума в злотих</div>
     <div class="field">
       <input type="text" inputmode="decimal" class="field-input mono" id="expenseAmount" placeholder="0,00 zł" autocomplete="off">
@@ -1071,8 +1109,12 @@
  
   <div class="stats-summary">
     <div class="stat-box">
-      <div class="k">Всього витрачено</div>
-      <div class="v mono" id="statTotal">0,00 zł</div>
+      <div class="k">Витрачено</div>
+      <div class="v mono expense-color" id="statExpense">0,00 zł</div>
+    </div>
+    <div class="stat-box">
+      <div class="k">Дохід</div>
+      <div class="v mono income-color" id="statIncome">0,00 zł</div>
     </div>
     <div class="stat-box">
       <div class="k">Записів</div>
@@ -1090,7 +1132,7 @@
 <!-- Edit expense sheet -->
 <div class="sheet" id="editSheet">
   <div class="sheet-handle"></div>
-  <div class="sheet-title">Редагувати запис</div>
+  <div class="sheet-title" id="editSheetTitle">Редагувати запис</div>
   <div class="sheet-subtitle">Змініть назву або суму</div>
   <div class="field">
     <label class="field-label">Назва</label>
@@ -1392,8 +1434,15 @@
   }
  
   // Total of expenses recorded, all-time for a wallet (used for stats display).
+  // Income entries have a negative `effect` (they add to balance instead of subtracting).
   function totalSpentAllTime(wallet) {
-    return wallet.expenses.reduce((s, e) => s + e.amount, 0);
+    return wallet.expenses.reduce((s, e) => s + entryEffect(e), 0);
+  }
+ 
+  // A record's effect on the balance: expenses subtract (positive effect),
+  // income entries add (negative effect, since this total gets subtracted from checkpoint).
+  function entryEffect(entry) {
+    return entry.type === 'income' ? -entry.amount : entry.amount;
   }
  
   // Total of expenses that count against the current balance checkpoint.
@@ -1509,22 +1558,23 @@
     const last5 = wallet.expenses.slice(0, 5);
  
     if (last5.length === 0) {
-      recentListEl.innerHTML = '<div class="recent-empty">Поки що жодного розходу</div>';
+      recentListEl.innerHTML = '<div class="recent-empty">Поки що жодного запису</div>';
       return;
     }
  
     recentListEl.innerHTML = '';
     last5.forEach(exp => {
       const row = document.createElement('div');
+      const isIncome = exp.type === 'income';
       row.className = 'recent-item';
       const timeStr = new Date(exp.ts).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
       row.innerHTML = `
-        <span class="recent-item-dot"></span>
+        <span class="recent-item-dot ${isIncome ? 'income' : ''}"></span>
         <div class="recent-item-info">
           <div class="recent-item-name">${escapeHtml(exp.name)}</div>
           <div class="recent-item-time">${timeStr}</div>
         </div>
-        <div class="recent-item-amount">−${fmt(exp.amount)}</div>
+        <div class="recent-item-amount ${isIncome ? 'income-color' : ''}">${isIncome ? '+' : '−'}${fmt(exp.amount)}</div>
       `;
       recentListEl.appendChild(row);
     });
@@ -1605,16 +1655,51 @@
  
   overlay.addEventListener('click', closeAllSheets);
  
-  // ---------- Add expense flow ----------
+  // ---------- Add expense / income flow ----------
   const step1 = document.getElementById('step1');
   const step2 = document.getElementById('step2');
   const dot1 = document.getElementById('dot1');
   const dot2 = document.getElementById('dot2');
   const expenseNameInput = document.getElementById('expenseName');
   const expenseAmountInput = document.getElementById('expenseAmount');
+  const step1Title = document.getElementById('step1Title');
+  const step1Subtitle = document.getElementById('step1Subtitle');
+  const step2Title = document.getElementById('step2Title');
   const step2Subtitle = document.getElementById('step2Subtitle');
+  const saveExpenseBtn = document.getElementById('saveExpense');
  
-  document.getElementById('addExpenseBtn').addEventListener('click', () => {
+  let currentEntryType = 'expense'; // 'expense' | 'income'
+ 
+  const ENTRY_COPY = {
+    expense: {
+      step1Title: 'Що придбали?',
+      step1Subtitle: 'Введіть назву продукту чи послуги',
+      step2Title: 'Скільки витрачено?',
+      namePlaceholder: 'Напр. Кава, Продукти, Таксі...',
+      saveLabel: 'Зберегти розхід',
+      toast: (amount) => `Списано ${fmt(amount)} zł`
+    },
+    income: {
+      step1Title: 'Звідки дохід?',
+      step1Subtitle: 'Введіть джерело надходження',
+      step2Title: 'Скільки надійшло?',
+      namePlaceholder: 'Напр. Зарплата, Подарунок, Продаж...',
+      saveLabel: 'Зберегти дохід',
+      toast: (amount) => `Нараховано +${fmt(amount)} zł`
+    }
+  };
+ 
+  function openEntrySheet(type) {
+    currentEntryType = type;
+    const copy = ENTRY_COPY[type];
+    step1Title.textContent = copy.step1Title;
+    step1Subtitle.textContent = copy.step1Subtitle;
+    step2Title.textContent = copy.step2Title;
+    expenseNameInput.placeholder = copy.namePlaceholder;
+    saveExpenseBtn.textContent = copy.saveLabel;
+    saveExpenseBtn.classList.toggle('btn-expense', type === 'expense');
+    saveExpenseBtn.classList.toggle('btn-income', type === 'income');
+ 
     expenseNameInput.value = '';
     expenseAmountInput.value = '';
     step1.style.display = 'block';
@@ -1623,7 +1708,10 @@
     dot2.classList.remove('active');
     openSheet('expense');
     setTimeout(() => expenseNameInput.focus(), 320);
-  });
+  }
+ 
+  document.getElementById('addExpenseBtn').addEventListener('click', () => openEntrySheet('expense'));
+  document.getElementById('addIncomeBtn').addEventListener('click', () => openEntrySheet('income'));
  
   document.getElementById('cancelStep1').addEventListener('click', closeAllSheets);
  
@@ -1632,7 +1720,7 @@
  
   function goToStep2() {
     const name = expenseNameInput.value.trim();
-    if (!name) { expenseNameInput.focus(); showToast('Введіть назву продукту', true); return; }
+    if (!name) { expenseNameInput.focus(); showToast('Введіть назву', true); return; }
     step2Subtitle.textContent = `Сума за «${name}» в злотих`;
     step1.style.display = 'none';
     step2.style.display = 'block';
@@ -1658,19 +1746,20 @@
   function saveExpenseHandler() {
     const name = expenseNameInput.value.trim();
     const amount = parseAmount(expenseAmountInput.value);
-    if (!name) { showToast('Введіть назву продукту', true); return; }
+    if (!name) { showToast('Введіть назву', true); return; }
     if (isNaN(amount) || amount <= 0) { expenseAmountInput.focus(); showToast('Введіть коректну суму', true); return; }
  
     activeWallet().expenses.unshift({
       id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
       name,
       amount,
+      type: currentEntryType,
       ts: Date.now()
     });
     saveState();
     renderBalance();
     closeAllSheets();
-    showToast(`Списано ${fmt(amount)} zł`);
+    showToast(ENTRY_COPY[currentEntryType].toast(amount));
   }
  
   document.getElementById('saveExpense').addEventListener('click', saveExpenseHandler);
@@ -1678,37 +1767,43 @@
  
   // ---------- Stats ----------
   const expenseListEl = document.getElementById('expenseList');
-  const statTotalEl = document.getElementById('statTotal');
+  const statExpenseEl = document.getElementById('statExpense');
+  const statIncomeEl = document.getElementById('statIncome');
   const statCountEl = document.getElementById('statCount');
  
   function renderStats() {
     const wallet = activeWallet();
     document.getElementById('statsTitle').textContent = `Статистика · ${WALLET_LABELS[state.activeWallet]}`;
-    document.getElementById('statsSubtitle').textContent = `Історія розходів гаманця «${WALLET_LABELS[state.activeWallet]}»`;
+    document.getElementById('statsSubtitle').textContent = `Історія операцій гаманця «${WALLET_LABELS[state.activeWallet]}»`;
     const expenses = wallet.expenses;
-    statTotalEl.textContent = fmt(totalSpentAllTime(wallet)) + ' zł';
+ 
+    const totalExpense = expenses.filter(e => e.type !== 'income').reduce((s, e) => s + e.amount, 0);
+    const totalIncome = expenses.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0);
+    statExpenseEl.textContent = fmt(totalExpense) + ' zł';
+    statIncomeEl.textContent = fmt(totalIncome) + ' zł';
     statCountEl.textContent = expenses.length;
  
     if (expenses.length === 0) {
-      expenseListEl.innerHTML = '<div class="expense-empty">Поки що жодного розходу.<br>Натисніть «Внести розхід», щоб додати перший запис.</div>';
+      expenseListEl.innerHTML = '<div class="expense-empty">Поки що жодного запису.<br>Натисніть «Внести розхід» або «Внести дохід», щоб додати перший.</div>';
       return;
     }
  
     expenseListEl.innerHTML = '';
     expenses.forEach(exp => {
       const item = document.createElement('div');
+      const isIncome = exp.type === 'income';
       item.className = 'expense-item';
       item.dataset.id = exp.id;
  
       const initial = exp.name.trim().charAt(0).toUpperCase() || '?';
  
       item.innerHTML = `
-        <div class="expense-icon">${initial}</div>
+        <div class="expense-icon ${isIncome ? 'income-icon' : ''}">${initial}</div>
         <div class="expense-info">
           <div class="expense-name">${escapeHtml(exp.name)}</div>
           <div class="expense-date">${fmtDate(exp.ts)}</div>
         </div>
-        <div class="expense-amount">−${fmt(exp.amount)} zł</div>
+        <div class="expense-amount ${isIncome ? 'income-color' : ''}">${isIncome ? '+' : '−'}${fmt(exp.amount)} zł</div>
         <button class="expense-menu-btn" aria-label="Дії">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="12" cy="19" r="1.2"/></svg>
         </button>
@@ -1778,6 +1873,8 @@
     editingId = id;
     editNameInput.value = exp.name;
     editAmountInput.value = exp.amount.toFixed(2).replace('.', ',');
+    document.getElementById('editSheetTitle').textContent =
+      exp.type === 'income' ? 'Редагувати дохід' : 'Редагувати розхід';
     openSheet('edit');
     setTimeout(() => editNameInput.focus(), 320);
   }
@@ -2050,6 +2147,7 @@
       id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
       name,
       amount,
+      type: 'expense',
       ts: Date.now()
     });
     saveState();
@@ -2277,6 +2375,7 @@
         id: now + '-' + idx + '-' + Math.random().toString(36).slice(2, 6),
         name: it.name.trim(),
         amount: it.amount,
+        type: 'expense',
         ts: now
       });
     });
